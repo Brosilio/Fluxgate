@@ -1,7 +1,3 @@
-# WAIT!!!
-This is very vulgar.
-Read at your own discretion.
-
 Fluxgate asyncronous event based networking libraries for C#/.NET.
 
 # Notes
