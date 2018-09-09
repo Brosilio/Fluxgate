@@ -56,8 +56,7 @@ namespace Fluxgate
         {
             UserProperties = new UserProperties();
             this.clientSocket = clientSocket;
-            Console.WriteLine("FUCK");
-            log?.Invoke("shit fuck");
+            log?.Invoke("Client started from open socket");
             StartReceiving();
         }
 
@@ -67,14 +66,17 @@ namespace Fluxgate
             clientSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             clientSocket.SendBufferSize = 32768;
             clientSocket.ReceiveBufferSize = 32768;
+            log?.Invoke("Client created.");
         }
 
         public void Connect(string host, int port)
         {
+            log?.Invoke($"Attempting connection to {host}:{port}");
             try
             {
                 clientSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
                 clientSocket.BeginConnect(host, port, new AsyncCallback(ConnectCallback), clientSocket);
+                log?.Invoke($"Connected to {host}:{port}");
             }
             catch (Exception ex)
             {
@@ -143,16 +145,15 @@ namespace Fluxgate
                 if (bytesRead > 0)
                 {
                     state.receivedBytes.AddRange(state.buffer.Take(bytesRead));
-                    log?.Invoke("some bytes got");
                     if (state.receivedBytes.Count >= 4)
                     {
                         if (state.dataSize == -1)
                         {
                             state.dataSize = BitConverter.ToInt32(state.receivedBytes.ToArray(), 0);
-                            log?.Invoke("Should probably be getting " + state.dataSize + " bytes");
                         }
                         if (state.receivedBytes.Count >= state.dataSize)
                         {
+                            state.receivedBytes.RemoveRange(0, 4);
                             OnFullPacket?.Invoke(state.receivedBytes.ToArray(), this);
                             state.Reset();
                             clientSocket.BeginReceive(state.buffer, 0, StateObject.BUFFER_SIZE, SocketFlags.None, new AsyncCallback(ReceiveCallback), state);
@@ -178,16 +179,20 @@ namespace Fluxgate
             }
         }
 
+        /// <summary>
+        /// Send data along connected socket.
+        /// Automatically prepends a four byte length header. (Removed before you receive data)
+        /// </summary>
+        /// <param name="data">The data to send.</param>
         public void Send(byte[] data)
         {
             try
             {
-                log?.Invoke("Sending a calculated " + (data.Length + 4) + " bytes");
-                List<byte> newBytes = new List<byte>(data.Length + 4);
-                newBytes.AddRange(BitConverter.GetBytes((data.Length + 4)));
-                newBytes.AddRange(data);
-                clientSocket.BeginSend(newBytes.ToArray(), 0, newBytes.Count, SocketFlags.None, new AsyncCallback(SendCallback), clientSocket);
-                log?.Invoke("Sending an actual" + newBytes.Count + " bytes");
+                byte[] buffer = new byte[data.Length + 4];
+                byte[] lengthBytes = BitConverter.GetBytes(data.Length);
+                Buffer.BlockCopy(lengthBytes, 0, buffer, 0, lengthBytes.Length);
+                Buffer.BlockCopy(data, 0, buffer, lengthBytes.Length, data.Length);
+                clientSocket.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(SendCallback), clientSocket);
             }
             catch(Exception ex)
             {
