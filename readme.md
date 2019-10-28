@@ -1,3 +1,6 @@
+# UPDATE
+This repository is garbage. Look elsewhere for good code.
+
 Fluxgate asyncronous event based networking libraries for C#/.NET.
 
 # Notes
